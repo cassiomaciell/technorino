@@ -740,7 +740,7 @@ void TextElement::addToContainer(MessageLayoutContainer &container,
             auto getTextLayoutElement = [&](QString text, qreal width,
                                             bool hasTrailingSpace) {
                 auto color = this->color_.getColor(ctx.messageColors);
-                app->getThemes()->normalizeColor(color);
+                // app->getThemes()->normalizeColor(color);
 
                 auto *e = new TextLayoutElement(
                     *this, text, QSizeF(width, metrics.height()), color,
@@ -987,7 +987,7 @@ void SingleLineTextElement::addToContainer(MessageLayoutContainer &container,
         auto getTextLayoutElement = [&](QString text, qreal width,
                                         bool hasTrailingSpace) {
             auto color = this->color_.getColor(ctx.messageColors);
-            app->getThemes()->normalizeColor(color);
+            // app->getThemes()->normalizeColor(color);
 
             auto *e = new TextLayoutElement(
                 *this, text, QSizeF(width, metrics.height()), color,
