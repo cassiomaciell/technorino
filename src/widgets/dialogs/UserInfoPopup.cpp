@@ -508,7 +508,11 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
         auto userlogs = user.emplace<LabelButton>("Logs", this)
                             .assign(&this->ui_.userlogsLabel);
 
+        auto stvUser = user.emplace<LabelButton>("7tv User", this)
+                           .assign(&this->ui_.stvUserLabel);
+
         userlogs->setVisible(false);
+        stvUser->setVisible(false);
 
         auto mod = user.emplace<PixmapButton>(this);
         mod->setPixmap(getResources().buttons.mod);
@@ -535,6 +539,14 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
             QDesktopServices::openUrl("https://tv.supa.sh/logs?c=" +
                                       this->underlyingChannel_->getName() +
                                       "&u=" + this->userName_);
+        });
+
+        QObject::connect(stvUser.getElement(), &Button::leftClicked, [this] {
+            if (!this->seventvUserID_.isEmpty())
+            {
+                QDesktopServices::openUrl("https://7tv.app/users/" +
+                                          this->seventvUserID_);
+            }
         });
 
         QObject::connect(mod.getElement(), &Button::leftClicked, [this] {
@@ -907,6 +919,11 @@ void UserInfoPopup::installEvents()
             getApp()->getUserData()->userDataUpdated().connect([this]() {
                 this->updateNotes();
             }));
+
+    QObject::connect(getApp()->getStreamerMode(), &IStreamerMode::changed, this,
+                     [this]() {
+                         this->updateNotes();
+                     });
 }
 
 void UserInfoPopup::setData(const QString &name, const ChannelPtr &channel)
@@ -929,7 +946,7 @@ void UserInfoPopup::setData(const QString &name,
     else
     {
         this->userName_ = name;
-        this->kickUserSlug_ = KickApi::slugify(name);
+        this->kickUserSlug_ = name;
     }
 
     this->channel_ = openingChannel;
@@ -1382,6 +1399,12 @@ void UserInfoPopup::loadSevenTVAvatar(const QString &userID, bool isKick)
             this->seventvUserID_ = userObj["id"].toString();
             auto url = userObj["avatar_url"].toString();
 
+            if (!this->seventvUserID_.isEmpty() &&
+                getSettings()->stvUsercardButton)
+            {
+                this->ui_.stvUserLabel->setVisible(true);
+            }
+
             if (url.isEmpty())
             {
                 return;
@@ -1503,7 +1526,13 @@ void UserInfoPopup::updateNotes()
         this->ui_.notesPreview->setVisible(false);
         return;
     }
-
+    if (getApp()->getStreamerMode()->isEnabled() &&
+        getSettings()->streamerModeHideUserNotes)
+    {
+        this->ui_.notesPreview->setText("Notes hidden in streamer mode.");
+        this->ui_.notesPreview->setVisible(true);
+        return;
+    }
     this->ui_.notesPreview->setText(userData->notes);
     this->ui_.notesPreview->setVisible(true);
 }

@@ -15,6 +15,32 @@
 #include "util/ChannelHelpers.hpp"
 
 #include <QRegularExpression>
+
+namespace {
+
+constexpr uint8_t MAX_RECURSION = 64;
+
+struct RecursionGuard {
+    constexpr RecursionGuard(uint8_t *count) noexcept
+        : count(count)
+    {
+        assert(*count < MAX_RECURSION);
+        *this->count += 1;
+    }
+    RecursionGuard(const RecursionGuard &) = delete;
+    RecursionGuard(RecursionGuard &&) = delete;
+    RecursionGuard &operator=(const RecursionGuard &) = delete;
+    RecursionGuard &operator=(RecursionGuard &&) = delete;
+    constexpr ~RecursionGuard()
+    {
+        *this->count -= 1;
+    }
+
+    uint8_t *count;
+};
+
+}  // namespace
+
 namespace chatterino {
 
 //
@@ -32,12 +58,21 @@ Channel::Channel(const QString &name, Type type, bool watching)
     {
         this->platform_ = "twitch";
     }
+
+    if (this->isKickChannel())
+    {
+        this->messagePlatform_ = MessagePlatform::Kick;
+    }
+    else
+    {
+        this->messagePlatform_ = MessagePlatform::AnyOrTwitch;
+    }
 }
 
 Channel::~Channel()
 {
     auto *app = tryGetApp();
-    if (app && this->anythingLogged_)
+    if (app && !isAppAboutToQuit() && this->anythingLogged_)
     {
         app->getChatLogger()->closeChannel(this->name_, this->platform_);
     }
@@ -128,6 +163,12 @@ MessagePtr Channel::getLastMessage() const
 void Channel::addMessage(MessagePtr message, MessageContext context,
                          std::optional<MessageFlags> overridingFlags)
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     message->freeze();
 
     MessagePtr deleted;
@@ -204,6 +245,12 @@ void Channel::disableAllMessages()
 
 void Channel::addMessagesAtStart(const std::vector<MessagePtr> &_messages)
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     for (const auto &msg : _messages)
     {
         msg->freeze();
@@ -224,6 +271,13 @@ void Channel::fillInMissingMessages(const std::vector<MessagePtr> &messages)
     {
         return;
     }
+
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     for (const auto &msg : messages)
     {
         msg->freeze();
@@ -312,6 +366,12 @@ void Channel::fillInMissingMessages(const std::vector<MessagePtr> &messages)
 void Channel::replaceMessage(const MessagePtr &message,
                              const MessagePtr &replacement)
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     replacement->freeze();
     int index = this->messages_.replaceItem(message, replacement);
 
@@ -323,6 +383,12 @@ void Channel::replaceMessage(const MessagePtr &message,
 
 void Channel::replaceMessage(size_t index, const MessagePtr &replacement)
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     replacement->freeze();
 
     MessagePtr prev;
@@ -335,6 +401,12 @@ void Channel::replaceMessage(size_t index, const MessagePtr &replacement)
 void Channel::replaceMessage(size_t hint, const MessagePtr &message,
                              const MessagePtr &replacement)
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     replacement->freeze();
 
     auto index = this->messages_.replaceItem(hint, message, replacement);
@@ -353,8 +425,43 @@ void Channel::disableMessage(const QString &messageID)
     }
 }
 
+void Channel::mergeFrom(const std::span<std::span<const MessagePtr>> sources)
+{
+    assert(this->messages_.empty());
+    this->messages_.pushFrontWhile([&] {
+        MessagePtr max;
+        QDateTime dt;
+        size_t curI = 0;
+        for (size_t i = 0; i < sources.size(); i++)
+        {
+            auto src = sources[i];
+            if (!src.empty())
+            {
+                QDateTime cur = src.back()->serverReceivedTime;
+                if (!dt.isValid() || cur > dt)
+                {
+                    max = src.back();
+                    dt = cur;
+                    curI = i;
+                }
+            }
+        }
+        if (max)
+        {
+            sources[curI] = sources[curI].subspan(0, sources[curI].size() - 1);
+        }
+        return max;
+    });
+}
+
 void Channel::clearMessages()
 {
+    RecursionGuard g{&this->recursionCount_};
+    if (!this->canRecurse())
+    {
+        return;
+    }
+
     this->messages_.clear();
     this->messagesCleared.invoke();
 }
@@ -476,6 +583,11 @@ void Channel::messageRemovedFromStart(const MessagePtr &msg)
 {
 }
 
+bool Channel::canRecurse() const noexcept
+{
+    return this->recursionCount_ < MAX_RECURSION;
+}
+
 void Channel::upsertPersonalSeventvEmotes(
     const QString &userLogin, const std::shared_ptr<const EmoteMap> &emoteMap)
 {
@@ -531,8 +643,8 @@ void Channel::upsertPersonalSeventvEmotes(
         /// @pre @a words must not be empty
         const auto flush = [&]() {
             elements.emplace_back(std::make_unique<TextElement>(
-                std::move(words), textElement->getFlags(), textElement->color(),
-                textElement->fontStyle()));
+                TextElement::CLONE, std::move(words), textElement->getFlags(),
+                textElement->color(), textElement->fontStyle()));
             words.clear();
         };
 
@@ -649,6 +761,11 @@ void Channel::upsertPersonalSeventvEmotes(
     cloned->elements = std::move(elements);
 
     this->replaceMessage(message.value(), cloned);
+}
+
+MessagePlatform Channel::messagePlatform() const
+{
+    return this->messagePlatform_;
 }
 
 //

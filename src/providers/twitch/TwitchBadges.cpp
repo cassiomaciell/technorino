@@ -4,14 +4,20 @@
 
 #include "providers/twitch/TwitchBadges.hpp"
 
+#include "Application.hpp"
+#include "common/Channel.hpp"
 #include "common/network/NetworkRequest.hpp"
 #include "common/network/NetworkResult.hpp"
 #include "common/QLogging.hpp"
 #include "messages/Emote.hpp"
 #include "messages/Image.hpp"
 #include "providers/twitch/api/Helix.hpp"
+#include "singletons/WindowManager.hpp"
 #include "util/DisplayBadge.hpp"
 #include "util/LoadPixmap.hpp"
+#include "widgets/Notebook.hpp"
+#include "widgets/splits/Split.hpp"
+#include "widgets/Window.hpp"
 
 #include <QBuffer>
 #include <QFile>
@@ -32,12 +38,12 @@ constexpr QSize BADGE_BASE_SIZE(18, 18);
 
 namespace chatterino {
 
-void TwitchBadges::loadTwitchBadges()
+void TwitchBadges::loadTwitchBadges(std::optional<ChannelPtr> messageChannel)
 {
     assert(this->loaded_ == false);
 
     getHelix()->getGlobalBadges(
-        [this](auto globalBadges) {
+        [this, messageChannel](auto globalBadges) {
             auto badgeSets = this->badgeSets_.access();
 
             for (const auto &badgeSet : globalBadges.badgeSets)
@@ -62,6 +68,12 @@ void TwitchBadges::loadTwitchBadges()
                     (*badgeSets)[setID][version.id] =
                         std::make_shared<Emote>(emote);
                 }
+            }
+
+            if (messageChannel.has_value())
+            {
+                messageChannel.value()->addSystemMessage(
+                    "Global Twitch badges loaded.");
             }
 
             this->loaded();
