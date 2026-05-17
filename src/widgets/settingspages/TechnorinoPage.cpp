@@ -110,37 +110,41 @@ void TechnorinoPage::initLayout(GeneralPageView &layout)
     SettingWidget::checkbox(
         "Show placeholder in text input box (requires restart)",
         s.showTextInputPlaceholder)
-        ->setTooltip("Show placeholder in text input box (requires restart)")
         ->addTo(layout);
     SettingWidget::checkbox("Convert #text to channel links", s.channelLinks)
-        ->setTooltip("Convert #text to channel links")
         ->addTo(layout);
 
     layout.addTitle("Miscellaneous");
     SettingWidget::checkbox("Fake messages as webchat", s.fakeWebChat)
-        ->setTooltip("Fake messages as webchat")
         ->addTo(layout);
     SettingWidget::checkbox("Use bot limits for messages",
                             s.useBotLimitsMessage)
-        ->setTooltip("Use bot limits for messages")
         ->addTo(layout);
     SettingWidget::checkbox("Use bot limits for JOINs", s.useBotLimitsJoin)
-        ->setTooltip("Use bot limits for JOINs")
         ->addTo(layout);
     SettingWidget::checkbox(
         "Enable. Required for abnormal nonce and webchat detection to work!",
         s.nonceFuckeryEnabled)
-        ->setTooltip("Enable. Required for abnormal nonce and webchat "
-                     "detection to work!")
         ->addTo(layout);
     SettingWidget::checkbox("Abnormal nonce detection",
                             s.abnormalNonceDetection)
-        ->setTooltip("Abnormal nonce detection")
         ->addTo(layout);
     SettingWidget::checkbox("\"7TV User\" usercard button", s.stvUsercardButton)
         ->setTooltip("Add \"7TV User\" button to usercard directly")
         ->addTo(layout);
-
+    SettingWidget::checkbox("Watching tab live sound", s.watchingTabLiveSound)
+        ->addTo(layout);
+    SettingWidget::checkbox("Auto detach watching tab (~10s timeout)",
+                            s.autoDetachLiveTab)
+        ->addTo(layout);
+    SettingWidget::checkbox("Markdown parsing (Experimental)",
+                            s.markdownParsing)
+        ->addTo(layout);
+    SettingWidget::checkbox(
+        "Anon read connection (requires restart) (Experimental)", s.anonRead)
+        ->setTooltip("Use an anon connection for the read connection. NOTE: "
+                     "This will NOT guarantee exclusion from viewerlists.")
+        ->addTo(layout);
     layout.addTitle("Client detection");
     SettingWidget::checkbox("Client detection highlights. ",
                             s.normalNonceDetection)
@@ -154,17 +158,6 @@ void TechnorinoPage::initLayout(GeneralPageView &layout)
     SettingWidget::colorButton("iOS color", getSettings()->iosColor)
         ->addTo(layout);
 
-    SettingWidget::checkbox("Watching tab live sound", s.watchingTabLiveSound)
-        ->setTooltip("Watching tab live sound")
-        ->addTo(layout);
-    SettingWidget::checkbox("Auto detach watching tab (~10s timeout)",
-                            s.autoDetachLiveTab)
-        ->setTooltip("Auto detach watching tab (~10s timeout)")
-        ->addTo(layout);
-    SettingWidget::checkbox("Markdown parsing (Experimental)",
-                            s.markdownParsing)
-        ->setTooltip("Markdown parsing (Experimental)")
-        ->addTo(layout);
     layout.addStretch();
 
     // invisible element for width
