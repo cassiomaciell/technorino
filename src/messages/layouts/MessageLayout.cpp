@@ -12,6 +12,7 @@
 #include "messages/MessageElement.hpp"
 #include "messages/Selection.hpp"
 #include "providers/colors/ColorProvider.hpp"
+#include "singletons/Resources.hpp"
 #include "singletons/Settings.hpp"
 #include "singletons/StreamerMode.hpp"
 #include "singletons/WindowManager.hpp"
@@ -20,12 +21,18 @@
 #include <QApplication>
 #include <QDebug>
 #include <QPainter>
+#include <qpixmap.h>
+#include <qpoint.h>
 #include <QtGlobal>
 #include <QThread>
+
+#include <optional>
 
 namespace chatterino {
 
 namespace {
+
+constexpr int SCROLLBAR_PADDING = 20;
 
 QColor blendColors(const QColor &base, const QColor &apply)
 {
@@ -385,6 +392,8 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
         return ctx.messageColors.regularBg;
     }();
 
+    std::optional<QPixmap> clientDetectionIcon = {};
+
     if (this->message_->flags.has(MessageFlag::ElevatedMessage) &&
         ctx.preferences.enableElevatedMessageHighlight)
     {
@@ -474,14 +483,41 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
                 backgroundColor = blendColors(
                     backgroundColor, QColor(getSettings()->webchatColor));
                 break;
+
             case Android:
                 backgroundColor = blendColors(
                     backgroundColor, QColor(getSettings()->androidColor));
                 break;
+
             case IOS:
                 backgroundColor = blendColors(backgroundColor,
                                               QColor(getSettings()->iosColor));
                 break;
+            case Unknown:
+            case Abnormal:
+                break;
+        }
+    }
+
+    if (getSettings()->clientDetectionIcon)
+    {
+        auto resources = getResources();
+
+        switch (this->message_->clientDetection)
+        {
+            using enum Message::ClientDetectionStatus;
+            case Webchat: {
+                clientDetectionIcon = resources.chat.twitch;
+                break;
+            }
+            case Android: {
+                clientDetectionIcon = resources.chat.android;
+                break;
+            }
+            case IOS: {
+                clientDetectionIcon = resources.chat.ios;
+                break;
+            }
 
             case Unknown:
             case Abnormal:
@@ -490,6 +526,18 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
     }
 
     painter.fillRect(buffer->rect(), backgroundColor);
+
+    if (getSettings()->clientDetectionIcon && clientDetectionIcon.has_value())
+    {
+        float size = 16 * this->scale_;
+        float right =
+            float(buffer->rect().right()) - (SCROLLBAR_PADDING * this->scale_);
+        int left = int(right - size);
+        int top = int((float(buffer->height()) - size * this->scale_) / 2);
+
+        painter.drawPixmap(QRect(left, top, int(size), int(size)),
+                           clientDetectionIcon.value());
+    }
 
     // draw message
     this->container_.paintElements(painter, ctx);
