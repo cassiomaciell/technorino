@@ -180,39 +180,19 @@ Split::Split(QWidget *parent)
             }
         });
 
-    // this connection can be ignored since the SplitInput is owned by this Split
+    // These connections can be ignored since the SplitInput is owned by this Split.
     std::ignore =
         this->input_->textChanged.connect([this](const QString &newText) {
-            if (getSettings()->showEmptyInput)
-            {
-                // We always show the input regardless of the text, so we can early out here
-                return;
-            }
-
-            if (newText.isEmpty())
-            {
-                this->input_->hide();
-            }
-            else if (this->input_->isHidden())
-            {
-                // Text updated and the input was previously hidden, show it
-                this->input_->show();
-            }
+            this->refreshInputState(newText);
         });
 
+    std::ignore = this->input_->historySearchStateChanged.connect([this] {
+        this->refreshInputState(this->input_->getInputText());
+    });
+
     getSettings()->showEmptyInput.connect(
-        [this](const bool &showEmptyInput) {
-            if (showEmptyInput)
-            {
-                this->input_->show();
-            }
-            else
-            {
-                if (this->input_->getInputText().isEmpty())
-                {
-                    this->input_->hide();
-                }
-            }
+        [this] {
+            this->refreshInputState(this->input_->getInputText());
         },
         this->signalHolder_);
 
@@ -889,6 +869,29 @@ void Split::refreshModerationMode()
     this->view_->queueLayout();
 }
 
+void Split::refreshInputState(const QString &inputText)
+{
+    if (getSettings()->showEmptyInput)
+    {
+        // We always show the input regardless of the text, so we can early out here
+        if (this->input_->isHidden())
+        {
+            this->input_->show();
+        }
+        return;
+    }
+
+    if (inputText.isEmpty() && !this->input_->isInHistorySearch())
+    {
+        this->input_->hide();
+    }
+    else
+    {
+        // Text updated and the input was previously hidden, show it
+        this->input_->show();
+    }
+}
+
 void Split::openChannelInBrowserPlayer(ChannelPtr channel)
 {
     if (auto *twitchChannel = dynamic_cast<TwitchChannel *>(channel.get()))
@@ -947,13 +950,9 @@ void Split::setChannel(IndirectChannel newChannel)
 
     this->view_->setChannel(newChannel.get());
 
-    this->usermodeChangedConnection_.disconnect();
-    this->roomModeChangedConnection_.disconnect();
     this->indirectChannelChangedConnection_.disconnect();
     this->channelSignalHolder_.clear();
 
-    TwitchChannel *tc = dynamic_cast<TwitchChannel *>(newChannel.get().get());
-    auto *kc = dynamic_cast<KickChannel *>(newChannel.get().get());
     auto *mc = dynamic_cast<MultiChannel *>(newChannel.get().get());
 
     if (mc)
@@ -961,40 +960,10 @@ void Split::setChannel(IndirectChannel newChannel)
         this->channelSignalHolder_.managedConnect(
             mc->activeChannelChanged, [this] {
                 this->updateInputPlaceholder();
+                this->updateChannelConnections();
             });
     }
-    else if (tc != nullptr)
-    {
-        this->usermodeChangedConnection_ = tc->userStateChanged.connect([this] {
-            this->header_->updateIcons();
-            this->header_->updateRoomModes();
-        });
-
-        this->roomModeChangedConnection_ = tc->roomModesChanged.connect([this] {
-            this->header_->updateRoomModes();
-        });
-
-        this->channelSignalHolder_.managedConnect(
-            tc->sendWaitUpdate, [this](const QString &text) {
-                this->getInput().setSendWaitStatus(text);
-            });
-    }
-    else if (kc != nullptr)
-    {
-        this->usermodeChangedConnection_ = kc->userStateChanged.connect([this] {
-            this->header_->updateIcons();
-            this->header_->updateRoomModes();
-        });
-
-        this->roomModeChangedConnection_ = kc->roomModesChanged.connect([this] {
-            this->header_->updateRoomModes();
-        });
-
-        this->channelSignalHolder_.managedConnect(
-            kc->sendWaitUpdate, [this](const QString &text) {
-                this->getInput().setSendWaitStatus(text);
-            });
-    }
+    this->updateChannelConnections();
 
     this->indirectChannelChangedConnection_ =
         newChannel.getChannelChanged().connect([this] {
@@ -1032,6 +1001,56 @@ void Split::setChannel(IndirectChannel newChannel)
 
     // Queue up save because: Split channel changed
     getApp()->getWindows()->queueSave();
+}
+
+void Split::updateChannelConnections()
+{
+    this->usermodeChangedConnection_.disconnect();
+    this->roomModeChangedConnection_.disconnect();
+    this->sendWaitConnection_ = pajlada::Signals::ScopedConnection{};
+    this->getInput().setSendWaitStatus({});
+
+    auto *channel = this->channel_.get().get();
+    auto *mc = dynamic_cast<MultiChannel *>(channel);
+    if (mc)
+    {
+        channel = mc->activeChannel()->channel.get();
+    }
+
+    auto *tc = dynamic_cast<TwitchChannel *>(channel);
+    auto *kc = dynamic_cast<KickChannel *>(channel);
+    if (tc)
+    {
+        this->usermodeChangedConnection_ = tc->userStateChanged.connect([this] {
+            this->header_->updateIcons();
+            this->header_->updateRoomModes();
+        });
+
+        this->roomModeChangedConnection_ = tc->roomModesChanged.connect([this] {
+            this->header_->updateRoomModes();
+        });
+
+        this->sendWaitConnection_ =
+            tc->sendWaitUpdate.connect([this](const QString &text) {
+                this->getInput().setSendWaitStatus(text);
+            });
+    }
+    else if (kc != nullptr)
+    {
+        this->usermodeChangedConnection_ = kc->userStateChanged.connect([this] {
+            this->header_->updateIcons();
+            this->header_->updateRoomModes();
+        });
+
+        this->roomModeChangedConnection_ = kc->roomModesChanged.connect([this] {
+            this->header_->updateRoomModes();
+        });
+
+        this->sendWaitConnection_ =
+            kc->sendWaitUpdate.connect([this](const QString &text) {
+                this->getInput().setSendWaitStatus(text);
+            });
+    }
 }
 
 void Split::setModerationMode(bool value)

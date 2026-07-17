@@ -560,7 +560,8 @@ std::unique_ptr<QMenu> SplitHeader::createMainMenu()
         menu->addSeparator();
     }
 
-    if (this->split_->getChannel()->getType() == Channel::Type::TwitchWhispers)
+    if (this->split_->getSelectedChannel()->getType() ==
+        Channel::Type::TwitchWhispers)
     {
         menu->addAction(
             OPEN_WHISPERS_IN_BROWSER,
@@ -756,8 +757,8 @@ std::unique_ptr<QMenu> SplitHeader::createChatModeMenu()
 
     auto execCommand = [this](const QString &command) {
         auto text = getApp()->getCommands()->execCommand(
-            command, this->split_->getChannel(), false);
-        this->split_->getChannel()->sendMessage(text);
+            command, this->split_->getSelectedChannel(), false);
+        this->split_->getSelectedChannel()->sendMessage(text);
     };
     auto toggle = [execCommand](const QString &command,
                                 QAction *action) mutable {
@@ -903,8 +904,20 @@ void SplitHeader::handleChannelChanged()
     this->updateChannelText();
 
     this->channelConnections_.clear();
-
     auto channel = this->split_->getChannel();
+    if (auto *multiChannel = dynamic_cast<MultiChannel *>(channel.get()))
+    {
+        this->channelConnections_.managedConnect(
+            multiChannel->activeChannelChanged, [this] {
+                this->handleChannelChanged();
+                this->updateRoomModes();
+            });
+        if (const auto *active = multiChannel->activeChannel())
+        {
+            channel = active->channel;
+        }
+    }
+
     if (auto *twitchChannel = dynamic_cast<TwitchChannel *>(channel.get()))
     {
         this->channelConnections_.managedConnect(
@@ -918,14 +931,6 @@ void SplitHeader::handleChannelChanged()
                                                  [this]() {
                                                      this->updateChannelText();
                                                  });
-    }
-    else if (auto *multiChannel = dynamic_cast<MultiChannel *>(channel.get()))
-    {
-        this->channelConnections_.managedConnect(
-            multiChannel->activeChannelChanged, [this] {
-                this->updateChannelText();
-                this->updateRoomModes();
-            });
     }
 }
 
@@ -950,13 +955,12 @@ void SplitHeader::setAddButtonVisible(bool value)
 void SplitHeader::updateChannelText()
 {
     auto indirectChannel = this->split_->getIndirectChannel();
-    auto channel = this->split_->getChannel();
     this->isLive_ = false;
     this->tooltipText_ = QString();
 
     auto selectedChannel = this->split_->getSelectedChannel();
 
-    auto title = channel->getLocalizedName();
+    auto title = selectedChannel->getLocalizedName();
 
     if (indirectChannel.getType() == Channel::Type::TwitchWatching)
     {
@@ -1265,7 +1269,7 @@ void SplitHeader::reloadChannelEmotes()
     }
     this->lastReloadedChannelEmotes_ = now;
 
-    auto channel = this->split_->getChannel();
+    auto channel = this->split_->getSelectedChannel();
 
     if (auto *twitchChannel = dynamic_cast<TwitchChannel *>(channel.get()))
     {
@@ -1290,7 +1294,7 @@ void SplitHeader::reloadSubscriberEmotes()
     }
     this->lastReloadedSubEmotes_ = now;
 
-    auto channel = this->split_->getChannel();
+    auto channel = this->split_->getSelectedChannel();
     if (auto *twitchChannel = dynamic_cast<TwitchChannel *>(channel.get()))
     {
         twitchChannel->refreshTwitchChannelEmotes(true);
