@@ -33,6 +33,7 @@ env:
 
 jobs:
   build-ubuntu-docker:
+    if: false
     # Our Ubuntu builds are built using Docker images that have been pre-published.
     # This speeds up builds for us since we do some pre-building of packages that takes a long time
     # However, this means if you need to add a dependency to the build, you'll need to do that
@@ -156,6 +157,7 @@ jobs:
           path: build/Chatterino-${{ matrix.os }}-x86_64.deb
 
   build-flatpak:
+    if: false
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:kde-6.10
@@ -183,18 +185,18 @@ jobs:
             force-lto: true
             skip-artifact: false
             skip-crashpad: false
-          # Windows on ARM
-          - os: windows-11-arm
-            qt-version: 6.9.3
-            force-lto: true
-            skip-artifact: false
-            skip-crashpad: false
-          # macOS (ARM)
-          - os: macos-latest
-            qt-version: 6.9.3
-            force-lto: true
-            skip-artifact: false
-            skip-crashpad: false
+          # # Windows on ARM
+          # - os: windows-11-arm
+          #   qt-version: 6.9.3
+          #   force-lto: true
+          #   skip-artifact: false
+          #   skip-crashpad: false
+          # # macOS (ARM)
+          # - os: macos-latest
+          #   qt-version: 6.9.3
+          #   force-lto: true
+          #   skip-artifact: false
+          #   skip-crashpad: false
 
       fail-fast: false
     env:
