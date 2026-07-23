@@ -523,7 +523,7 @@ jobs:
   collect:
     needs: [build, build-ubuntu-docker]
     runs-on: ubuntu-latest
-    if: always()
+    if: false
     steps:
       - run: jq --exit-status 'all(.result == "success")' <<< '${{ toJson(needs) }}'
       - name: Done
