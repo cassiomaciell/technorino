@@ -308,7 +308,7 @@ MessagePaintResult MessageLayout::paint(const MessagePaintContext &ctx)
             QRectF{
                 0.0,
                 static_cast<qreal>(ctx.y),
-                this->container_.getWidth() + 64,
+                static_cast<qreal>(ctx.canvasWidth),
                 1.0,
             },
             ctx.messageColors.messageSeperator);
@@ -491,6 +491,10 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
                 backgroundColor = blendColors(backgroundColor,
                                               QColor(getSettings()->iosColor));
                 break;
+            case MobileNew:
+                backgroundColor = blendColors(
+                    backgroundColor, QColor(getSettings()->mobileNewColor));
+                break;
             case Unknown:
             case Abnormal:
                 break;
@@ -514,6 +518,10 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
             }
             case IOS: {
                 clientDetectionIcon = resources.chat.ios;
+                break;
+            }
+            case MobileNew: {
+                clientDetectionIcon = resources.chat.mobile;
                 break;
             }
 

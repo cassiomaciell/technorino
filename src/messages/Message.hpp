@@ -11,7 +11,7 @@
 #include "util/QStringHash.hpp"
 
 #include <QColor>
-#include <QTime>
+#include <QDateTime>
 
 #include <cinttypes>
 #include <functional>
@@ -52,7 +52,6 @@ struct Message {
     // const-correct way to deal with this is.
     // This might bring race conditions with it
     mutable MessageFlags flags;
-    QTime parseTime;
     QString id;
     QString searchText;
     QString messageText;
@@ -118,6 +117,8 @@ struct Message {
         Android,
         // UUID4 (standard) uppercase
         IOS,
+        // [a-z0-9]{10,12}
+        MobileNew,
         // Does not match any of the known clients
         Abnormal,
     };

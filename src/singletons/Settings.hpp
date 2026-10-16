@@ -105,6 +105,13 @@ enum class TwitchReadConnectionMode : uint8_t {
     AnonymousParallel,
 };
 
+enum class KickConnectionPreference : uint8_t {
+    Default = 0,
+    Pusher = (1 << 0),
+    Centrifugo = (1 << 1),
+    Any = Pusher | Centrifugo,
+};
+
 constexpr std::optional<std::string_view> qmagicenumDisplayName(
     EmoteTooltipScale value) noexcept
 {
@@ -248,6 +255,10 @@ public:
     EnumSetting<NotebookTabVisibility> tabVisibility = {
         "/appearance/tabVisibility",
         NotebookTabVisibility::AllTabs,
+    };
+    BoolSetting growWrappedNotebookLines = {
+        "/appearance/growWrappedNotebookLines",
+        false,
     };
 
     //    BoolSetting collapseLongMessages =
@@ -816,6 +827,9 @@ public:
     QStringSetting webchatColor = {"/misc/webchatColor", "#3FFFA30B"};
     QStringSetting androidColor = {"/misc/androidColor", "#3F25D300"};
     QStringSetting iosColor = {"/misc/iosColor", "#3FFF69B4"};
+
+    QStringSetting mobileNewColor = {"/misc/mobileNewColor", "#3F25D300"};
+
     BoolSetting clientDetectionIcon = {"/misc/clientDetectionIcon", false};
     BoolSetting fakeWebChat = {"/misc/fakeWebChat", false};
 
@@ -825,6 +839,7 @@ public:
 
     BoolSetting loadTwitchMessageHistoryOnConnect = {
         "/misc/twitch/loadMessageHistoryOnConnect", true};
+    QStringSetting messageHistoryUrl = {"/misc/twitch/messageHistoryUrl", ""};
     IntSetting twitchMessageHistoryLimit = {
         "/misc/twitch/messageHistoryLimit",
         800,
@@ -843,6 +858,11 @@ public:
     EnumStringSetting<TwitchReadConnectionMode> twitchReadConnectionMode = {
         "/misc/x-7tv/twitchReadConnectionMode",
         TwitchReadConnectionMode::Authenticated};
+
+    EnumStringSetting<KickConnectionPreference> kickConnectionPreference = {
+        "/misc/x-7tv/kick/connectionPreference",
+        KickConnectionPreference::Default,
+    };
 
     EnumStringSetting<ChatSendProtocol> chatSendProtocol = {
         "/misc/chatSendProtocol", ChatSendProtocol::Default};
