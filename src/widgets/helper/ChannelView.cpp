@@ -479,11 +479,25 @@ Split *ChannelView::findParentSplit() const
     }
 
     auto *searchPopup = dynamic_cast<SearchPopup *>(this->parentWidget());
-    if (!searchPopup)
+    if (searchPopup)
     {
-        return nullptr;
+        return dynamic_cast<Split *>(searchPopup->parentWidget());
     }
-    return dynamic_cast<Split *>(searchPopup->parentWidget());
+
+    if (this->parentWidget() != nullptr)
+    {
+        if (this->parentWidget()->parentWidget() != nullptr)
+        {
+            auto *userInfoPopup = dynamic_cast<UserInfoPopup *>(
+                this->parentWidget()->parentWidget()->parentWidget());
+            if (userInfoPopup != nullptr)
+            {
+                split = userInfoPopup->getSplit();
+            }
+        }
+    }
+
+    return split;
 }
 
 bool ChannelView::pausable() const
@@ -1406,9 +1420,7 @@ void ChannelView::messageAppended(MessagePtr &message,
              messageFlags->has(MessageFlag::ShowInMentions) &&
              !messageFlags->has(MessageFlag::Subscription) &&
              (getSettings()->highlightMentions ||
-              this->channel_->getType() != Channel::Type::TwitchMentions)) ||
-            (this->channel_->getType() == Channel::Type::TwitchAutomod &&
-             getSettings()->enableAutomodHighlight))
+              this->channel_->getType() != Channel::Type::TwitchMentions)))
         {
             this->tabHighlightRequested.invoke(HighlightState::Highlighted);
         }
@@ -2215,10 +2227,15 @@ void ChannelView::mouseMoveEvent(QMouseEvent *event)
     const auto *emoteElement = dynamic_cast<const EmoteElement *>(element);
     const auto *layeredEmoteElement =
         dynamic_cast<const LayeredEmoteElement *>(element);
-    bool isNotEmote = emoteElement == nullptr && layeredEmoteElement == nullptr;
+    const auto *scalingImageElement =
+        dynamic_cast<const ScalingImageElement *>(element);
+    bool isEmoteOrTwitchGif =
+        emoteElement != nullptr || layeredEmoteElement != nullptr ||
+        (scalingImageElement != nullptr &&
+         element->getFlags().has(MessageElementFlag::TwitchGif));
 
     if (element->getTooltip().isEmpty() ||
-        (isLinkValid && isNotEmote && !getSettings()->linkInfoTooltip))
+        (isLinkValid && !isEmoteOrTwitchGif && !getSettings()->linkInfoTooltip))
     {
         this->tooltipWidget_->hide();
     }
@@ -3056,20 +3073,19 @@ void ChannelView::addMessageContextMenuItems(QMenu *menu,
     const auto msg = layout->getMessage();
     if (!msg->channelName.isEmpty())
     {
-        menu->addAction(
-            "Open in &logs",
-            [messageID = msg->id, channelName = msg->channelName,
-             dateTime = QDateTime(msg->serverReceivedTime).toUTC()] {
-                QString logsDate = dateTime.toString("yyyy-MM-dd");
-                QString logsJumpHash =
-                    messageID.isEmpty()
-                        ? dateTime.toString("yyyy-MM-ddTHH:mm:ssZ")
-                        : messageID;
+        menu->addAction("Open in &logs",
+                        [messageID = msg->id, channelName = msg->channelName,
+                         dateTime = QDateTime(msg->timestamp).toUTC()] {
+                            QString logsDate = dateTime.toString("yyyy-MM-dd");
+                            QString logsJumpHash =
+                                messageID.isEmpty()
+                                    ? dateTime.toString("yyyy-MM-ddTHH:mm:ssZ")
+                                    : messageID;
 
-                QDesktopServices::openUrl(QUrl(u"https://tv.supa.sh/logs?c=" %
-                                               channelName % u"&d=" % logsDate %
-                                               u"#" % logsJumpHash));
-            });
+                            QDesktopServices::openUrl(QUrl(
+                                u"https://tv.supa.sh/logs?c=" % channelName %
+                                u"&d=" % logsDate % u"#" % logsJumpHash));
+                        });
     }
 }
 
